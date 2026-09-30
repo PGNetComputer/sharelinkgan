@@ -770,7 +770,9 @@ function unggahDana(file){
     t.thumb=p.thumb; render();
     var isi=function(teks){ if(!teks) return; var b=bacaInvoice(teks); if(b.total&&!String(f.nominal||'').replace(/\D/g,'')) f.nominal=rp(b.total); t.info=b.total?'Terbaca: '+rp(b.total):''; };
     if(p.teks) isi(p.teks);
-    unggah({id:id, orang:DATA.siapa, nama:file.name, mime:p.mime, data:p.data, preview:p.preview, ocr:!p.teks}, function(e,r){
+    var pisah=!p.teks && bisaPost();
+    if(pisah){ t.info='Membaca total…'; render(); unggah({id:idBaru(), mime:p.mime, data:p.data}, function(e2,r2){ if(!e2&&r2&&r2.teks){ isi(r2.teks); } else t.info=''; if(!t.info) t.info=''; render(); }, 'bacaGambar'); }
+    unggah({id:id, orang:DATA.siapa, nama:file.name, mime:p.mime, data:p.data, preview:p.preview, ocr:!p.teks && !pisah}, function(e,r){
       if(e){ t.status='gagal'; t.galat='Belum tersimpan: '+(e.message||e); render(); jalankanTugas(); return; }
       t.status='siap'; t.hasil={fileId:r.fileId, previewId:r.previewId||'', mime:r.mime}; if(!p.teks&&r.teks) isi(r.teks); render(); jalankanTugas();
     });
@@ -1111,7 +1113,7 @@ function gambarKeJpeg(sumber, lebar, tinggi, maks, mutu){
 }
 function thumbDari(dataUrl){ return new Promise(function(ok){ var im=new Image(); im.onload=function(){ ok(gambarKeJpeg(im,im.width,im.height,160,0.7)); }; im.onerror=function(){ ok(''); }; im.src=dataUrl; }); }
 /** file -> { mime, data(base64), preview(base64|''), teks(pdf)|'' , thumb } */
-function siapkanFile(file){
+function siapkanFile(file, kecil){
   var mime=file.type||'';
   if(/pdf$/i.test(file.name||'')) mime='application/pdf';
   if(mime==='application/pdf'){
@@ -1136,17 +1138,19 @@ function siapkanFile(file){
   if(!/^image\//.test(mime)) return Promise.reject(new Error('Pilih file PDF atau gambar.'));
   return new Promise(function(ok,gagal){
     var url=URL.createObjectURL(file), im=new Image();
-    im.onload=function(){ var j=gambarKeJpeg(im,im.naturalWidth,im.naturalHeight,1600,0.82); URL.revokeObjectURL(url);
+    im.onload=function(){ var j=kecil?gambarKeJpeg(im,im.naturalWidth,im.naturalHeight,1280,0.72):gambarKeJpeg(im,im.naturalWidth,im.naturalHeight,1600,0.8); URL.revokeObjectURL(url);
       thumbDari(j).then(function(th){ ok({mime:'image/jpeg', data:j.split(',')[1], preview:'', teks:'', thumb:th}); }); };
     im.onerror=function(){ URL.revokeObjectURL(url); gagal(new Error('Gambar tidak bisa dibuka.')); };
     im.src=url;
   });
 }
 /** Kirim lewat POST (cepat), tanyakan hasilnya; kalau gagal, pakai jalur JSONP terpotong. */
-function unggah(d, selesai){
+function bisaPost(){ return !!((window.APP_CFG&&APP_CFG.APPS_SCRIPT) && window.fetch && !window.__TEST_RUN); }
+function unggah(d, selesai, fn){
+  fn=fn||'unggahInvoice';
   var base=(window.APP_CFG&&APP_CFG.APPS_SCRIPT)||'', mulai=Date.now(), sudah=false;
   function akhir(e,r){ if(sudah) return; sudah=true; selesai(e,r); }
-  function cadangan(){ srv().withSuccessHandler(function(r){ akhir(null,r); }).withFailureHandler(function(e){ akhir(e); }).unggahInvoice(d); }
+  function cadangan(){ if(fn!=='unggahInvoice'){ akhir(new Error('lewati')); return; } srv().withSuccessHandler(function(r){ akhir(null,r); }).withFailureHandler(function(e){ akhir(e); }).unggahInvoice(d); }
   if(window.__TEST_RUN || !window.fetch || !base){ cadangan(); return; }
   function tanya(){
     if(sudah) return;
@@ -1154,7 +1158,7 @@ function unggah(d, selesai){
     srv().withSuccessHandler(function(r){ if(r&&r.menunggu) setTimeout(tanya,900); else akhir(null,r); })
       .withFailureHandler(function(e){ akhir(e); }).hasilPost(d.id);
   }
-  fetch(base,{method:'POST', mode:'no-cors', headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify({k:KODE, fn:'unggahInvoice', id:d.id, d:d})})
+  fetch(base,{method:'POST', mode:'no-cors', headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify({k:KODE, fn:fn, id:d.id, d:d})})
     .then(function(){ setTimeout(tanya,600); }).catch(function(){ cadangan(); });
 }
 var modePilih=null, panasTerakhir=0;
@@ -1247,11 +1251,19 @@ function invUntukForm(file){
     var h=p.teks?bacaInvoice(p.teks):null;
     inv.status='unggah'; if(h){ inv.baca=h; inv.info=ringkasBaca(h); }
     if(aktif()){ render(); if(h) isiForm(h); }
-    unggah({id:id, orang:nama, nama:file.name, mime:p.mime, data:p.data, preview:p.preview, ocr:!p.teks}, function(e,r){
+    var pisah=!p.teks && bisaPost();
+    if(pisah){ inv.info='<span class="o">Membaca teks screenshot…</span>'; if(aktif()) render();
+      unggah({id:idBaru(), mime:p.mime, data:p.data}, function(e2,r2){
+        var t2=!e2&&r2&&r2.teks; if(t2){ var h3=bacaInvoice(t2); inv.baca=h3; inv.info=ringkasBaca(h3); if(aktif()){ render(); isiForm(h3); }
+          ANTRE.forEach(function(a){ if((a.lampTunggu===id||(a.lampiran&&inv.hasil&&a.lampiran.fileId===inv.hasil.fileId)) && !a.totalInv && h3.total) a.totalInv=h3.total; }); }
+        else { inv.info='<span class="o">Teks screenshot tidak terbaca, isi manual ya.</span>'; if(aktif()) render(); }
+      }, 'bacaGambar');
+    }
+    unggah({id:id, orang:nama, nama:file.name, mime:p.mime, data:p.data, preview:p.preview, ocr:!p.teks && !pisah}, function(e,r){
       if(e){ inv.status='gagal'; inv.galat='Invoice belum tersimpan: '+(e.message||e)+' Tekan × lalu coba lagi.'; if(aktif()) render(); lepasTunggu(id); return; }
       inv.status='siap'; inv.hasil=r;
       if(!h && r.teks){ var h2=bacaInvoice(r.teks); inv.baca=h2; inv.info=ringkasBaca(h2); if(aktif()){ render(); isiForm(h2); } }
-      else { if(!h) inv.info='<span class="o">Teks screenshot tidak terbaca, isi manual ya.</span>'; if(aktif()) render(); }
+      else { if(!h && !pisah) inv.info='<span class="o">Teks screenshot tidak terbaca, isi manual ya.</span>'; if(aktif()) render(); }
       lepasTunggu(id);
     });
   }).catch(function(e){ inv.status='gagal'; inv.galat=e.message||String(e); if(aktif()) render(); lepasTunggu(id); });
@@ -1488,7 +1500,7 @@ function pasangFormTrf(){
 }
 function unggahFileTrf(file, tujuan, orang){
   var id=idBaru(); tujuan.status='unggah'; tujuan.nama=file.name; tujuan.upId=id; UPLOAD[id]=tujuan; render();
-  siapkanFile(file).then(function(p){
+  siapkanFile(file, true).then(function(p){
     tujuan.thumb=p.thumb; tujuan.mime=p.mime; render();
     unggah({id:id, orang:orang, nama:file.name, mime:p.mime, data:p.data, preview:p.preview, ocr:false}, function(e,r){
       if(e){ tujuan.status='gagal'; tujuan.galat='Belum tersimpan: '+(e.message||e); render(); jalankanTugas(); return; }
