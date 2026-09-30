@@ -1,6 +1,6 @@
-var CACHE = 'sharelinkgan-v4';
+var CACHE = 'sharelinkgan-v6';
 var CACHE_BAGI = 'sl-bagikan';
-var FILES = ['./', './index.html', './config.js', './manifest.json', './ikon-192.png', './ikon-512.png', './apple-touch-icon.png'];
+var FILES = ['./', './index.html', './config.js', './manifest.json', './ikon-192.png', './ikon-512.png', './apple-touch-icon.png', './ikon-badge.png'];
 self.addEventListener('install', function (e) {
   e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(FILES); }).then(function () { return self.skipWaiting(); }));
 });
@@ -44,7 +44,7 @@ self.addEventListener('push', function (e) {
   var judul = d.judul || n.title || 'SHARELINKGAN', isi = d.isi || n.body || '';
   var badge = parseInt(d.badge, 10);
   var tugas = [self.registration.showNotification(judul, {
-    body: isi, icon: 'ikon-192.png', badge: 'ikon-192.png', tag: d.tag || 'sharelinkgan', renotify: true, data: { url: './?tab=transfer' }
+    body: isi, icon: 'ikon-192.png', badge: 'ikon-badge.png', tag: d.tag || 'sharelinkgan', renotify: true, data: { url: './?tab=transfer' }
   })];
   if (self.navigator && self.navigator.setAppBadge && !isNaN(badge)) tugas.push(badge > 0 ? self.navigator.setAppBadge(badge) : self.navigator.clearAppBadge());
   tugas.push(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (cs) { cs.forEach(function (c) { c.postMessage({ sl: 'muat' }); }); }));
