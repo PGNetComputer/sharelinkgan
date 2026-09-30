@@ -6,12 +6,12 @@ var APP_CFG = {
   // Nilai-nilai ini BUKAN rahasia (memang dipakai di browser), aman ditaruh di GitHub.
   // Kunci rahasia (file JSON service account) TIDAK ditaruh di sini, tapi di Properti Skrip Apps Script.
   FIREBASE: {
-    apiKey: '',
-    authDomain: '',
-    projectId: '',
-    messagingSenderId: '',
-    appId: '',
-    vapidKey: ''
+    apiKey: 'AIzaSyD1fHfh7HJbvRZGmOFyrX60rDhS-sTDcQI',
+    authDomain: 'sharelinkgan-16526.firebaseapp.com',
+    projectId: 'sharelinkgan-16526',
+    messagingSenderId: '770631250376',
+    appId: '1:770631250376:web:7089170cb91ebb8bf090fd',
+    vapidKey: 'BHmA1wGPGSjvJVP6qdMj8hz_CDWVrzJlVygzBDDMF2LaU17ZEeGiGkAMnTSLAa-iIMvSCzLRJsTpmJIMZggoioA'
   }
 };
 if (typeof window !== 'undefined') window.APP_CFG = APP_CFG;
