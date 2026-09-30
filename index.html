@@ -483,6 +483,12 @@ button,input,textarea{font-family:inherit}
 .logo.logo-img{background:transparent!important;color:inherit!important;padding:0!important;overflow:visible}
 .logo-img img{width:100%;height:100%;display:block;object-fit:contain}
 .layar-tengah .logo.logo-img{box-shadow:none!important}
+
+/* foto lokal bisa diketuk */
+.thumb-klik{padding:0;border:0;background:none;display:block;flex:none;cursor:zoom-in}
+.foto-penuh{position:fixed;inset:0;background:rgba(20,18,15,.92);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px}
+.foto-penuh img{max-width:100%;max-height:100%;object-fit:contain;border-radius:8px;background:#fff}
+.foto-penuh button{position:absolute;top:12px;right:14px;width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.15);color:#fff;font-size:24px;border:0}
 </style>
 </head>
 <body>
@@ -741,10 +747,8 @@ function komisiHtml(nama){
 }
 function invStatusHtml(){
   var v=S.inv; if(!v) return '<button class="inv-btn" data-pilihinv><span class="i">📎</span><span><b>Ambil dari invoice</b><small>PDF atau screenshot Shopee / Tokopedia / Toco. Isian terisi otomatis.</small></span></button>';
-  var gb=v.thumb?'<img src="'+v.thumb+'">':'<div class="pdf">'+(v.mime==='application/pdf'?'PDF':'IMG')+'</div>', tx;
-  if(v.status==='baca') tx='<span class="o">Membaca invoice…</span>';
-  else if(v.status==='unggah') tx='<span class="o">Menyimpan invoice ke Drive…</span>'+(v.info?'<br>'+v.info:'');
-  else if(v.status==='gagal') tx='<span class="m">'+esc(v.galat)+'</span>';
+  var gb=thumbKlik(v, v.thumb?'<img src="'+v.thumb+'">':'<div class="pdf">'+(v.mime==='application/pdf'?'PDF':'IMG')+'</div>'), tx;
+  if(v.status==='gagal') tx='<span class="m">'+esc(v.galat)+'</span>';
   else tx='<span class="g">✓ Invoice terlampir</span>'+(v.info?'<br>'+v.info:'');
   return '<div class="inv-status">'+gb+'<div class="tx">'+esc(v.nama||'')+'<br>'+tx+'</div><button class="x" data-hapusinv aria-label="Hapus invoice">×</button></div>';
 }
@@ -757,24 +761,20 @@ function formDanaHtml(aju){
   var h='<div class="form" id="formDana">'+pilihModeHtml('dana')
     +(aju?'<div class="dana-info" style="background:#f6eee6;color:#8a5a3b">👍 Dari pengajuan: '+esc(aju.barang)+'</div>':'')
     +'<div class="dana-info">1. Kirim screenshot pesanan yang belum dibayar (yang ada <b>Total Pembayaran</b>-nya).<br>2. '+esc(petugasNama())+' transfer & kirim bukti.<br>3. Bayar ke penjual, lalu lampirkan invoice PDF-nya.</div>';
-  h+= v ? '<div class="aju-foto">'+(v.thumb?'<img src="'+v.thumb+'">':'<div class="pdf">IMG</div>')+'<div class="tx">'+(v.status==='siap'?'<span class="g">✓ Screenshot tersimpan</span>'+(v.info?'<span style="font-weight:600;font-size:12px">'+esc(v.info)+'</span>':''):v.status==='gagal'?'<span class="m">'+esc(v.galat)+'</span>':'<span class="o">Membaca & menyimpan…</span>')+'<button data-danafilehapus>Ganti foto</button></div></div>'
+  h+= v ? '<div class="aju-foto">'+thumbKlik(v, v.thumb?'<img src="'+v.thumb+'">':'<div class="pdf">IMG</div>')+'<div class="tx">'+(v.status==='gagal'?'<span class="m">'+esc(v.galat)+'</span>':'<span class="g">✓ Screenshot terlampir</span><span style="font-weight:600;font-size:12px;color:var(--abu)">Ketuk gambar untuk melihat</span>')+'<button data-danafilehapus>Ganti foto</button></div></div>'
     : '<button class="aju-ambil" data-danafile><span class="i">📷</span><b>Pilih screenshot pesanan</b><small>Halaman “Rincian Pesanan” yang masih “Bayar dalam …”.</small></button>';
-  h+='<label>Total pembayaran</label><input name="nominal" inputmode="numeric" placeholder="Rp0" value="'+esc(f.nominal||'')+'">'
-    +'<div class="bantuan">Terisi otomatis dari screenshot kalau terbaca. Cek lagi ya.</div>'
+  h+='<label>Total pembayaran</label><input name="nominal" inputmode="numeric" placeholder="Ketik total, cth. 1.350.000" value="'+esc(f.nominal||'')+'">'
     +'<div class="pesan">'+esc(f.galat||'')+'</div><button class="btn" data-kirimdana'+(f.jalan?' disabled>Mengirim…':'>Kirim ke '+esc(petugasNama()))+'</button></div>';
   return h;
 }
 function unggahDana(file){
   var f=S.fdana, t=f.file={status:'unggah', nama:file.name}, id=idBaru(); t.upId=id; UPLOAD[id]=t; render();
-  siapkanFile(file).then(function(p){
+  siapkanFile(file, true).then(function(p){
     t.thumb=p.thumb; render();
-    var isi=function(teks){ if(!teks) return; var b=bacaInvoice(teks); if(b.total&&!String(f.nominal||'').replace(/\D/g,'')) f.nominal=rp(b.total); t.info=b.total?'Terbaca: '+rp(b.total):''; };
-    if(p.teks) isi(p.teks);
-    var pisah=!p.teks && bisaPost();
-    if(pisah){ t.info='Membaca total…'; render(); unggah({id:idBaru(), mime:p.mime, data:p.data}, function(e2,r2){ if(!e2&&r2&&r2.teks){ isi(r2.teks); } else t.info=''; if(!t.info) t.info=''; render(); }, 'bacaGambar'); }
-    unggah({id:id, orang:DATA.siapa, nama:file.name, mime:p.mime, data:p.data, preview:p.preview, ocr:!p.teks && !pisah}, function(e,r){
+    t.lokal=lokalDari(p); render();
+    unggah({id:id, orang:DATA.siapa, nama:file.name, mime:p.mime, data:p.data, preview:p.preview, ocr:false}, function(e,r){
       if(e){ t.status='gagal'; t.galat='Belum tersimpan: '+(e.message||e); render(); jalankanTugas(); return; }
-      t.status='siap'; t.hasil={fileId:r.fileId, previewId:r.previewId||'', mime:r.mime}; if(!p.teks&&r.teks) isi(r.teks); render(); jalankanTugas();
+      t.status='siap'; t.hasil={fileId:r.fileId, previewId:r.previewId||'', mime:r.mime}; render(); jalankanTugas();
     });
   }).catch(function(e){ t.status='gagal'; t.galat=e.message||String(e); render(); jalankanTugas(); });
 }
@@ -786,7 +786,7 @@ function kirimDana(){
   if(f.galat){ render(); return; }
   if(fileJalan(f.file)){
     tugasBaru('buatPermintaan',{id:f.id, jenis:'dana', nominal:nominal, penjual:(f.penjual||'').trim(), setujuId:S.setujuId||''},{lampiran:f.file},'Permintaan dana','Permintaan dana '+rp(nominal)+' dikirim ke '+petugasNama());
-    S.fdana=null; S.catatMode=null; S.lembar=null; S.setujuId=null; toast('Dikirim. Foto masih diunggah, nanti sampai ke '+petugasNama()+' otomatis.'); render(); return;
+    S.fdana=null; S.catatMode=null; S.lembar=null; S.setujuId=null; toast('Terkirim ✓'); render(); return;
   }
   f.jalan=true; render();
   srv().withSuccessHandler(function(){ S.fdana=null; S.catatMode=null; S.lembar=null; S.setujuId=null; toast('Permintaan dana '+rp(nominal)+' dikirim ke '+petugasNama()); muat(true); })
@@ -805,7 +805,7 @@ function formHtml(){
    +'<div class="bantuan">Tulis nama toko saja, tanpa “SP / TP / TC”.</div>'
    +'<label>Harga beli</label><input name="harga" inputmode="numeric" placeholder="Rp0">'
    +(dana||isAdmin()?'':'<div class="bantuan" style="margin-top:10px">💸 Setelah disimpan, permintaan ganti uang otomatis dikirim ke '+esc(petugasNama())+'.</div>')
-   +'<button class="btn" id="simpan">Simpan pembelian</button>'+(S.inv&&(S.inv.status==='baca'||S.inv.status==='unggah')?'<div class="catatan" style="margin-top:6px;text-align:center">Invoice masih diunggah, boleh langsung simpan. Nanti terpasang otomatis.</div>':'')+'</div>';
+   +'<button class="btn" id="simpan">Simpan pembelian</button></div>';
 }
 function kepala(judul, sub, kiri){
   var mem=S.memuat?'<span class="putar">↻</span>':'↻';
@@ -985,7 +985,7 @@ function pasangForm(lama){
     S.inv=null; S.danaId=null; S.setujuId=null;
     lsSet(ANTRE_KEY,ANTRE);
     S.lembar=null; S.filter='semua'; S.cari='';
-    toast(tunggu?'Dicatat. Invoice masih diunggah, nanti tersimpan otomatis ke tab '+nama+'…':'Dicatat. Sedang dikirim ke tab '+nama+'…');
+    toast('Dicatat ✓');
     kirimAntre();
   });
 }
@@ -1198,6 +1198,13 @@ function ringkasBaca(h){
 /* ---------- tugas latar: kirim formulir walau foto masih diunggah ---------- */
 var TUGAS_KEY='pgnet_sl_tugas', TUGAS=lsGet(TUGAS_KEY,[]), UPLOAD={};
 TUGAS.forEach(function(t){ Object.keys(t).forEach(function(k){ if(k.charAt(0)==='_') delete t[k]; }); });
+function lokalDari(p){ return p.preview?'data:image/jpeg;base64,'+p.preview:(/^image\//.test(p.mime)?'data:'+p.mime+';base64,'+p.data:''); }
+function thumbKlik(x, isi){ var k=x&&x.upId&&x.lokal?x.upId:''; return k?'<button type="button" class="thumb-klik" data-lihatlokal="'+esc(k)+'" aria-label="Lihat">'+isi+'</button>':isi; }
+function lihatLokal(id){
+  var x=UPLOAD[id]||INV_TUNGGU[id]; if(!x||!x.lokal) return;
+  var o=document.createElement('div'); o.className='foto-penuh'; o.innerHTML='<img src="'+x.lokal+'" alt="Screenshot"><button aria-label="Tutup">×</button>';
+  o.addEventListener('click',function(){ o.remove(); }); document.body.appendChild(o);
+}
 function fileSiap(x){ return x&&x.hasil?{fileId:x.hasil.fileId, previewId:x.hasil.previewId||'', mime:x.hasil.mime}:null; }
 function fileJalan(x){ return !!(x && !x.hasil && x.status!=='gagal' && x.upId); }
 function fileOk(x){ return !!(x && (x.status==='siap' || fileJalan(x))); }
@@ -1247,12 +1254,12 @@ function invUntukForm(file){
   var inv=S.inv={status:'baca', nama:file.name, mime:file.type, upId:id}; INV_TUNGGU[id]=inv; render();
   function aktif(){ return S.inv===inv; }
   siapkanFile(file).then(function(p){
-    inv.thumb=p.thumb; inv.mime=p.mime;
+    inv.thumb=p.thumb; inv.mime=p.mime; inv.lokal=lokalDari(p);
     var h=p.teks?bacaInvoice(p.teks):null;
     inv.status='unggah'; if(h){ inv.baca=h; inv.info=ringkasBaca(h); }
     if(aktif()){ render(); if(h) isiForm(h); }
     var pisah=!p.teks && bisaPost();
-    if(pisah){ inv.info='<span class="o">Membaca teks screenshot…</span>'; if(aktif()) render();
+    if(pisah){
       unggah({id:idBaru(), mime:p.mime, data:p.data}, function(e2,r2){
         var t2=!e2&&r2&&r2.teks; if(t2){ var h3=bacaInvoice(t2); inv.baca=h3; inv.info=ringkasBaca(h3); if(aktif()){ render(); isiForm(h3); }
           ANTRE.forEach(function(a){ if((a.lampTunggu===id||(a.lampiran&&inv.hasil&&a.lampiran.fileId===inv.hasil.fileId)) && !a.totalInv && h3.total) a.totalInv=h3.total; }); }
@@ -1321,7 +1328,7 @@ function pasangLamp(dl){
   }).pasangLampiran({orang:dl.orang, baris:dl.b[7], no:dl.b[2], lampiran:dl.lampiran});
 }
 function slotBukti(x,pilih,hapus,judul,sub){
-  if(x) return '<div class="inv-status" style="margin-top:10px">'+(x.thumb?'<img src="'+x.thumb+'">':'<div class="pdf">'+(x.mime==='application/pdf'?'PDF':'IMG')+'</div>')+'<div class="tx"><b style="font-size:12px">'+esc(judul.replace(/^\d\. /,''))+'</b><br>'+(x.status==='siap'?'<span class="g">✓ Tersimpan</span>':x.status==='gagal'?'<span class="m">'+esc(x.galat)+'</span>':'<span class="o">Menyimpan…</span>')+'</div><button class="x" data-'+hapus+'>×</button></div>';
+  if(x) return '<div class="inv-status" style="margin-top:10px">'+thumbKlik(x, x.thumb?'<img src="'+x.thumb+'">':'<div class="pdf">'+(x.mime==='application/pdf'?'PDF':'IMG')+'</div>')+'<div class="tx"><b style="font-size:12px">'+esc(judul.replace(/^\d\. /,''))+'</b><br>'+(x.status==='gagal'?'<span class="m">'+esc(x.galat)+'</span>':'<span class="g">✓ Terlampir</span>')+'</div><button class="x" data-'+hapus+'>×</button></div>';
   return '<button class="inv-btn" style="margin-top:10px;border-color:#f0b3ab;background:var(--merah-muda);color:var(--merah)" data-'+pilih+'><span class="i">📷</span><span><b>'+judul+' (wajib)</b><small>'+sub+'</small></span></button>';
 }
 function bukaInvoice(b, asli, batal){
@@ -1501,7 +1508,7 @@ function pasangFormTrf(){
 function unggahFileTrf(file, tujuan, orang){
   var id=idBaru(); tujuan.status='unggah'; tujuan.nama=file.name; tujuan.upId=id; UPLOAD[id]=tujuan; render();
   siapkanFile(file, true).then(function(p){
-    tujuan.thumb=p.thumb; tujuan.mime=p.mime; render();
+    tujuan.thumb=p.thumb; tujuan.mime=p.mime; tujuan.lokal=lokalDari(p); render();
     unggah({id:id, orang:orang, nama:file.name, mime:p.mime, data:p.data, preview:p.preview, ocr:false}, function(e,r){
       if(e){ tujuan.status='gagal'; tujuan.galat='Belum tersimpan: '+(e.message||e); render(); jalankanTugas(); return; }
       tujuan.status='siap'; tujuan.hasil={fileId:r.fileId, previewId:r.previewId||'', mime:r.mime}; render(); jalankanTugas();
@@ -1535,12 +1542,12 @@ function dialogTrfHtml(d){
   var t=d.t, an=S.anim?' anim':'', gal=d.galat?'<p style="color:var(--merah);font-weight:700;margin-top:10px">'+esc(d.galat)+'</p>':'';
   if(d.jenis==='trfok'){
     var rk=rekOrang(t.orang), v=d.bukti;
-    var fileBox=v?'<div class="inv-status" style="margin-top:12px">'+(v.thumb?'<img src="'+v.thumb+'">':'<div class="pdf">IMG</div>')+'<div class="tx">'+esc(v.nama||'')+'<br>'+(v.status==='siap'?'<span class="g">✓ Bukti tersimpan</span>':v.status==='gagal'?'<span class="m">'+esc(v.galat)+'</span>':'<span class="o">Menyimpan…</span>')+'</div></div>'
+    var fileBox=v?'<div class="inv-status" style="margin-top:12px">'+thumbKlik(v, v.thumb?'<img src="'+v.thumb+'">':'<div class="pdf">IMG</div>')+'<div class="tx">'+esc(v.nama||'')+'<br>'+(v.status==='gagal'?'<span class="m">'+esc(v.galat)+'</span>':'<span class="g">✓ Bukti terlampir</span>')+'</div></div>'
       :'<button class="inv-btn" style="margin-top:12px" data-buktifile><span class="i">🧾</span><span><b>Lampirkan bukti m-Transfer</b><small>Screenshot bukti transfer, supaya '+esc(t.orang)+' bisa cek.</small></span></button>';
     return '<div class="tirai tengah'+an+'" data-tirai><div class="dialog"><h3>Sudah transfer ke '+esc(t.orang)+'?</h3>'
       +'<p><b>'+rp(t.nominal)+'</b> ke '+(rk?esc(rk.bank+' '+rk.no+' a.n. '+rk.atas):'(rekening belum diisi)')+'</p>'
       +'<p style="font-size:12.5px;color:var(--abu);margin-top:6px">'+(t.jenis==='Minta dana'?esc(t.orang)+' akan diberi tahu untuk membayar ke penjual lalu melampirkan invoice.':esc(t.orang)+' akan diberi tahu uangnya sudah diganti.')+'</p>'
-      +fileBox+gal+'<div class="aksi"><button class="btn putih" data-tutup>Batal</button><button class="btn" data-yakintrf'+(d.jalan||(v&&v.status==='unggah')?' disabled':'')+'>'+(d.jalan?'Menyimpan…':v?'Ya, sudah':'Ya, tanpa bukti')+'</button></div></div></div>';
+      +fileBox+gal+'<div class="aksi"><button class="btn putih" data-tutup>Batal</button><button class="btn" data-yakintrf'+(d.jalan||(v&&v.status==='gagal')?' disabled':'')+'>'+(d.jalan?'Menyimpan…':v?'Ya, sudah':'Ya, tanpa bukti')+'</button></div></div></div>';
   }
   if(d.jenis==='trfmasuk') return '<div class="tirai tengah'+an+'" data-tirai><div class="dialog"><h3>Refund sudah masuk?</h3><p><b>'+rp(t.nominal)+'</b> dari '+esc(t.orang)+' untuk <span class="mono">'+esc(t.no)+'</span>.</p><p style="font-size:12.5px;color:var(--abu);margin-top:6px">Cek mutasi rekening dulu ya.</p>'+gal
       +'<div class="aksi"><button class="btn putih" data-tutup>Batal</button><button class="btn" data-yakinmasuk'+(d.jalan?' disabled':'')+'>'+(d.jalan?'Menyimpan…':'Ya, sudah masuk')+'</button></div></div></div>';
@@ -1552,6 +1559,11 @@ function dialogTrfHtml(d){
 function prosesTrf(aksi){
   var d=S.dialog; if(!d||d.jalan) return;
   if(aksi==='tolak'){ var a=document.getElementById('alasanTolak'); d.alasan=a?a.value:''; }
+  if(aksi!=='tolak' && fileJalan(d.bukti)){
+    tugasBaru('prosesTransfer',{id:d.t.id, aksi:aksi, alasan:d.alasan||''},{bukti:d.bukti},'Transfer '+d.t.orang,'Tercatat sudah ditransfer. '+d.t.orang+' diberi tahu.');
+    d.t.status=d.t.jenis==='Minta dana'?'Menunggu invoice':'Selesai'; d.t.trfOleh=isAdmin()?'Hani':DATA.siapa; d.t.trfPada=new Date().toISOString();
+    S.dialog=null; simpanData(); toast('Tercatat ✓'); render(); return;
+  }
   d.jalan=true; d.galat=null; render();
   srv().withSuccessHandler(function(r){
     d.t.status=r.status; if(aksi!=='tolak'){ d.t.trfOleh=isAdmin()?'Hani':DATA.siapa; d.t.trfPada=new Date().toISOString(); }
@@ -1733,7 +1745,7 @@ function bagianAjuHani(){
 function formAjuHtml(){
   var f=S.faju||{}, inc=f.incaran&&daftarInc().find(function(i){return i.id===f.incaran;}), v=f.file;
   var h='<div class="form" id="formAju">'+(inc?'<div class="dana-info" style="background:#f6eee6;color:#8a5a3b">🎯 Untuk incaran: '+esc(inc.barang)+(inc.maks?' · maks '+rp(inc.maks):'')+(inc.catatan?'<br><span style="font-weight:600">'+esc(inc.catatan)+'</span>':'')+'</div>':'');
-  h+= v ? '<div class="aju-foto">'+(v.thumb?'<img src="'+v.thumb+'">':'<div class="pdf">IMG</div>')+'<div class="tx">'+(v.status==='siap'?'<span class="g">✓ Screenshot tersimpan</span>':v.status==='gagal'?'<span class="m">'+esc(v.galat)+'</span>':'<span class="o">Menyimpan…</span>')+'<button data-ajufilehapus>Ganti foto</button></div></div>'
+  h+= v ? '<div class="aju-foto">'+thumbKlik(v, v.thumb?'<img src="'+v.thumb+'">':'<div class="pdf">IMG</div>')+'<div class="tx">'+(v.status==='gagal'?'<span class="m">'+esc(v.galat)+'</span>':'<span class="g">✓ Screenshot terlampir</span><span style="font-weight:600;font-size:12px;color:var(--abu)">Ketuk gambar untuk melihat</span>')+'<button data-ajufilehapus>Ganti foto</button></div></div>'
     : '<button class="aju-ambil" data-ajufile><span class="i">📷</span><b>Pilih screenshot barang</b><small>Screenshot halaman barang di Shopee / Tokopedia, lengkap dengan harganya.</small></button>';
   h+='<label>Keterangan</label><textarea name="keterangan" rows="3" placeholder="cth. SSD NVMe 1TB 100%, harga 1,48 jt, mau nego dulu">'+esc(f.keterangan||'')+'</textarea>';
   h+='<div class="pesan">'+esc(f.galat||'')+'</div><button class="btn" data-kirimaju'+(f.jalan?' disabled>Mengirim…':'>Kirim ke Hani')+'</button></div>';
@@ -1772,7 +1784,7 @@ function kirimAju(){
   if(f.galat){ render(); return; }
   if(fileJalan(f.file)){
     tugasBaru('ajukanSetuju',{id:f.id, keterangan:String(f.keterangan||'').trim(), incaran:f.incaran||''},{lampiran:f.file},'Pengajuan','Pengajuan dikirim ke Hani');
-    S.faju=null; S.lembar=null; toast('Dikirim. Foto masih diunggah, nanti sampai ke Hani otomatis.'); render(); return;
+    S.faju=null; S.lembar=null; toast('Terkirim ✓'); render(); return;
   }
   f.jalan=true; render();
   srv().withSuccessHandler(function(){ S.faju=null; S.lembar=null; toast('Pengajuan dikirim ke Hani'); muat(true); })
@@ -1993,6 +2005,7 @@ document.getElementById('app').addEventListener('click',function(e){
   if(t.hasAttribute('data-buktitf')&&S.dialog&&S.dialog.jenis==='batal'){ pilihFile({jenis:'buktitf'}); return; }
   if(t.hasAttribute('data-buktitfhapus')&&S.dialog){ S.dialog.buktiTf=null; render(); return; }
   if(d.lihattfbatal){ var bb3=cariItem(orangAktif(),d.lihattfbatal); if(bb3) bukaInvoice(bb3,false,'tf'); return; }
+  if(d.lihatlokal){ lihatLokal(d.lihatlokal); return; }
   if(d.lihatbatal){ var bb2=cariItem(orangAktif(),d.lihatbatal); if(bb2) bukaInvoice(bb2,false,true); return; }
   if(d.catatmode){ S.catatMode=d.catatmode; render(); return; }
   if(t.hasAttribute('data-danafile')){ pilihFile({jenis:'dana'}); return; }
@@ -2072,7 +2085,7 @@ function tandaiBatal(){
   var dl=S.dialog; if(!dl||dl.jalan) return;
   if(fileJalan(dl.bukti)||fileJalan(dl.buktiTf)){
     tugasBaru('tandaiBatal',{id:dl.id, orang:dl.orang, baris:dl.b[7], no:dl.b[2]},{bukti:dl.bukti,buktiTf:dl.buktiTf},'Pembatalan '+namaToko(dl.b[3]),namaToko(dl.b[3])+' ditandai dibatalkan');
-    dl.b[5]='Dibatalkan'; S.dialog=null; S.aksi=null; simpanData(); toast('Ditandai dibatalkan. Bukti masih diunggah, nanti tersimpan otomatis.'); render(); return;
+    dl.b[5]='Dibatalkan'; S.dialog=null; S.aksi=null; simpanData(); toast('Ditandai dibatalkan ✓'); render(); return;
   }
   dl.jalan=true; dl.galat=null; render();
   srv().withSuccessHandler(function(r){
@@ -2086,7 +2099,7 @@ function cairkan(){
   var dl=S.dialog; if(!dl||dl.jalan) return;
   if(fileJalan(dl.bukti)){
     tugasBaru('cairkan',{id:dl.id, orang:dl.orang, nominal:dl.nominal},{bukti:dl.bukti},'Pencairan komisi '+dl.orang,'Komisi '+dl.orang+' '+rp(dl.nominal)+' dicatat sudah cair');
-    S.dialog=null; S.lembar=null; toast('Dicatat. Bukti masih diunggah, nanti tersimpan otomatis.'); render(); return;
+    S.dialog=null; S.lembar=null; toast('Dicatat ✓'); render(); return;
   }
   dl.jalan=true; dl.galat=null; render();
   srv().withSuccessHandler(function(r){
