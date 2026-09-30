@@ -761,27 +761,31 @@ function formDanaHtml(aju){
     : '<button class="aju-ambil" data-danafile><span class="i">📷</span><b>Pilih screenshot pesanan</b><small>Halaman “Rincian Pesanan” yang masih “Bayar dalam …”.</small></button>';
   h+='<label>Total pembayaran</label><input name="nominal" inputmode="numeric" placeholder="Rp0" value="'+esc(f.nominal||'')+'">'
     +'<div class="bantuan">Terisi otomatis dari screenshot kalau terbaca. Cek lagi ya.</div>'
-    +'<div class="pesan">'+esc(f.galat||'')+'</div><button class="btn" data-kirimdana'+(f.jalan||(v&&v.status==='unggah')?' disabled>'+(f.jalan?'Mengirim…':'Menunggu foto…'):'>Kirim ke '+esc(petugasNama()))+'</button></div>';
+    +'<div class="pesan">'+esc(f.galat||'')+'</div><button class="btn" data-kirimdana'+(f.jalan?' disabled>Mengirim…':'>Kirim ke '+esc(petugasNama()))+'</button></div>';
   return h;
 }
 function unggahDana(file){
-  var f=S.fdana, t=f.file={status:'unggah', nama:file.name}, id=idBaru(); render();
+  var f=S.fdana, t=f.file={status:'unggah', nama:file.name}, id=idBaru(); t.upId=id; UPLOAD[id]=t; render();
   siapkanFile(file).then(function(p){
     t.thumb=p.thumb; render();
     var isi=function(teks){ if(!teks) return; var b=bacaInvoice(teks); if(b.total&&!String(f.nominal||'').replace(/\D/g,'')) f.nominal=rp(b.total); t.info=b.total?'Terbaca: '+rp(b.total):''; };
     if(p.teks) isi(p.teks);
     unggah({id:id, orang:DATA.siapa, nama:file.name, mime:p.mime, data:p.data, preview:p.preview, ocr:!p.teks}, function(e,r){
-      if(e){ t.status='gagal'; t.galat='Belum tersimpan: '+(e.message||e); render(); return; }
-      t.status='siap'; t.hasil={fileId:r.fileId, previewId:r.previewId||'', mime:r.mime}; if(!p.teks&&r.teks) isi(r.teks); render();
+      if(e){ t.status='gagal'; t.galat='Belum tersimpan: '+(e.message||e); render(); jalankanTugas(); return; }
+      t.status='siap'; t.hasil={fileId:r.fileId, previewId:r.previewId||'', mime:r.mime}; if(!p.teks&&r.teks) isi(r.teks); render(); jalankanTugas();
     });
-  }).catch(function(e){ t.status='gagal'; t.galat=e.message||String(e); render(); });
+  }).catch(function(e){ t.status='gagal'; t.galat=e.message||String(e); render(); jalankanTugas(); });
 }
 function kirimDana(){
   var fm=document.getElementById('formDana'), f=S.fdana; if(!fm||!f||f.jalan) return;
   fm.querySelectorAll('input').forEach(function(i){ f[i.name]=i.value; });
   var nominal=+String(f.nominal||'').replace(/\D/g,''); f.galat='';
-  if(!(f.file&&f.file.hasil)) f.galat='Pilih screenshot pesanannya dulu.'; else if(!nominal) f.galat='Isi total pembayaran.'; else if(!rekOrang(DATA.siapa)) f.galat='Isi rekeningmu dulu di tab Ajuan (Rekening untuk menerima transfer).';
+  if(!fileOk(f.file)) f.galat='Pilih screenshot pesanannya dulu.'; else if(!nominal) f.galat='Isi total pembayaran.'; else if(!rekOrang(DATA.siapa)) f.galat='Isi rekeningmu dulu di tab Ajuan (Rekening untuk menerima transfer).';
   if(f.galat){ render(); return; }
+  if(fileJalan(f.file)){
+    tugasBaru('buatPermintaan',{id:f.id, jenis:'dana', nominal:nominal, penjual:(f.penjual||'').trim(), setujuId:S.setujuId||''},{lampiran:f.file},'Permintaan dana','Permintaan dana '+rp(nominal)+' dikirim ke '+petugasNama());
+    S.fdana=null; S.catatMode=null; S.lembar=null; S.setujuId=null; toast('Dikirim. Foto masih diunggah, nanti sampai ke '+petugasNama()+' otomatis.'); render(); return;
+  }
   f.jalan=true; render();
   srv().withSuccessHandler(function(){ S.fdana=null; S.catatMode=null; S.lembar=null; S.setujuId=null; toast('Permintaan dana '+rp(nominal)+' dikirim ke '+petugasNama()); muat(true); })
     .withFailureHandler(function(e){ f.jalan=false; f.galat=e.message||String(e); render(); })
@@ -799,7 +803,7 @@ function formHtml(){
    +'<div class="bantuan">Tulis nama toko saja, tanpa “SP / TP / TC”.</div>'
    +'<label>Harga beli</label><input name="harga" inputmode="numeric" placeholder="Rp0">'
    +(dana||isAdmin()?'':'<div class="bantuan" style="margin-top:10px">💸 Setelah disimpan, permintaan ganti uang otomatis dikirim ke '+esc(petugasNama())+'.</div>')
-   +'<button class="btn" id="simpan"'+(S.inv&&(S.inv.status==='baca'||S.inv.status==='unggah')?' disabled>Menunggu invoice…':'>Simpan pembelian')+'</button></div>';
+   +'<button class="btn" id="simpan">Simpan pembelian</button>'+(S.inv&&(S.inv.status==='baca'||S.inv.status==='unggah')?'<div class="catatan" style="margin-top:6px;text-align:center">Invoice masih diunggah, boleh langsung simpan. Nanti terpasang otomatis.</div>':'')+'</div>';
 }
 function kepala(judul, sub, kiri){
   var mem=S.memuat?'<span class="putar">↻</span>':'↻';
@@ -884,7 +888,7 @@ function dialogHtml(){
       +'<p style="font-size:12.5px;color:var(--abu);margin-top:8px">Tercatat di tab tersembunyi <b>Log Pencairan</b>, lalu AL4 & AM4 di tab '+esc(d.orang)+' diperbarui. '+esc(d.orang)+' dapat notifikasi dan bisa melihat bukti transfernya.</p>'
       +slotBukti(d.bukti,'buktikomisi','buktikomisihapus','Screenshot transfer komisi','Bukti kamu sudah transfer '+rp(r.sekarang)+' ke '+esc(d.orang)+'.')
       +(d.galat?'<p style="color:var(--merah);font-weight:700;margin-top:10px">'+esc(d.galat)+'</p>':'')
-      +'<div class="aksi"><button class="btn putih" data-tutup>Batal</button><button class="btn" data-yakin'+(d.jalan||!(d.bukti&&d.bukti.status==='siap')?' disabled':'')+'>'+(d.jalan?'Menyimpan…':'Ya, cairkan')+'</button></div></div></div>';
+      +'<div class="aksi"><button class="btn putih" data-tutup>Batal</button><button class="btn" data-yakin'+(d.jalan||!fileOk(d.bukti)?' disabled':'')+'>'+(d.jalan?'Menyimpan…':'Ya, cairkan')+'</button></div></div></div>';
   }
   if(d.jenis==='batal'){
     var b=d.b;
@@ -894,7 +898,7 @@ function dialogHtml(){
       +(d.wajib?slotBukti(d.bukti,'buktibatal','buktibatalhapus','1. Screenshot transaksi dibatalkan','Halaman pesanan yang sudah berstatus dibatalkan / refund.'):'')
       +(d.perluTf?slotBukti(d.buktiTf,'buktitf','buktitfhapus','2. Screenshot transfer ke Hani','Bukti kamu sudah mengembalikan '+rp(b[4])+' ke Hani.'):'')
       +(d.galat?'<p style="color:var(--merah);font-weight:700;margin-top:10px">'+esc(d.galat)+'</p>':'')
-      +'<div class="aksi"><button class="btn putih" data-tutup>Batal</button><button class="btn" style="background:var(--merah)" data-yakinbatal'+(d.jalan||(d.wajib&&!(d.bukti&&d.bukti.status==='siap'))||(d.perluTf&&!(d.buktiTf&&d.buktiTf.status==='siap'))?' disabled':'')+'>'+(d.jalan?'Menyimpan…':'Ya, dibatalkan')+'</button></div></div></div>';
+      +'<div class="aksi"><button class="btn putih" data-tutup>Batal</button><button class="btn" style="background:var(--merah)" data-yakinbatal'+(d.jalan||(d.wajib&&!fileOk(d.bukti))||(d.perluTf&&!fileOk(d.buktiTf))?' disabled':'')+'>'+(d.jalan?'Menyimpan…':'Ya, dibatalkan')+'</button></div></div></div>';
   }
   if(d.jenis==='lampbeda'){
     return '<div class="tirai tengah" data-tirai><div class="dialog"><h3>No. Pesanan berbeda</h3>'
@@ -970,15 +974,16 @@ function pasangForm(lama){
     var ada=cekNoLokal(nov); if(ada){ pesan.textContent='⚠ No. Pesanan ini sudah dicatat oleh '+ada.orang+'. Tidak disimpan.'; return; }
     var nama=orangAktif();
     var lamp=(S.inv&&S.inv.status==='siap'&&S.inv.hasil)?{fileId:S.inv.hasil.fileId, previewId:S.inv.hasil.previewId||'', mime:S.inv.hasil.mime}:null;
+    var tunggu=(!lamp&&S.inv&&(S.inv.status==='baca'||S.inv.status==='unggah'))?S.inv.upId:'';
     var danaId=S.danaId||'', bayar=(danaId||isAdmin())?'':'ganti';
-    if(danaId && !lamp){ pesan.textContent='Lampirkan invoice dulu supaya dana ini bisa ditutup.'; return; }
+    if(danaId && !lamp && !tunggu){ pesan.textContent='Lampirkan invoice dulu supaya dana ini bisa ditutup.'; return; }
     if(bayar&&!rekOrang(nama)&&!isAdmin()){ pesan.textContent='Isi rekeningmu dulu di tab Ajuan (Rekening untuk menerima transfer), atau pilih “Tidak perlu transfer”.'; return; }
-    ANTRE.push({id:idBaru(), orang:nama, tgl:tgl, jam:jam, no:nov, penjual:pj, harga:h, lampiran:lamp, dibuat:Date.now(),
+    ANTRE.push({id:idBaru(), orang:nama, tgl:tgl, jam:jam, no:nov, penjual:pj, harga:h, lampiran:lamp, lampTunggu:tunggu||undefined, dibuat:Date.now(),
       mintaGanti:bayar==='ganti', mintaDana:bayar==='dana', danaId:danaId, setujuId:S.setujuId||'', totalInv:(S.inv&&S.inv.baca&&S.inv.baca.total)||0});
     S.inv=null; S.danaId=null; S.setujuId=null;
     lsSet(ANTRE_KEY,ANTRE);
     S.lembar=null; S.filter='semua'; S.cari='';
-    toast('Dicatat. Sedang dikirim ke tab '+nama+'…');
+    toast(tunggu?'Dicatat. Invoice masih diunggah, nanti tersimpan otomatis ke tab '+nama+'…':'Dicatat. Sedang dikirim ke tab '+nama+'…');
     kirimAntre();
   });
 }
@@ -987,7 +992,8 @@ function pasangForm(lama){
 var kirimJalan=false, kirimUlangJam=null;
 function kirimAntre(){
   if(kirimJalan) return;
-  var a=ANTRE.find(function(x){ return !x.gagal || (!x.duplikat && !x.permanen && Date.now()-(x.gagalPada||0)>15000); });
+  ANTRE.forEach(function(x){ if(x.lampTunggu && !INV_TUNGGU[x.lampTunggu]) pulihkanTunggu(x); });
+  var a=ANTRE.find(function(x){ return !x.lampTunggu && (!x.gagal || (!x.duplikat && !x.permanen && Date.now()-(x.gagalPada||0)>15000)); });
   if(!a) return;
   kirimJalan=true;
   srv().withSuccessHandler(function(r){
@@ -1145,14 +1151,17 @@ function unggah(d, selesai){
   function tanya(){
     if(sudah) return;
     if(Date.now()-mulai>45000){ cadangan(); return; }
-    srv().withSuccessHandler(function(r){ if(r&&r.menunggu) setTimeout(tanya,1500); else akhir(null,r); })
+    srv().withSuccessHandler(function(r){ if(r&&r.menunggu) setTimeout(tanya,900); else akhir(null,r); })
       .withFailureHandler(function(e){ akhir(e); }).hasilPost(d.id);
   }
   fetch(base,{method:'POST', mode:'no-cors', headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify({k:KODE, fn:'unggahInvoice', id:d.id, d:d})})
-    .then(function(){ setTimeout(tanya,1200); }).catch(function(){ cadangan(); });
+    .then(function(){ setTimeout(tanya,600); }).catch(function(){ cadangan(); });
 }
-var modePilih=null;
+var modePilih=null, panasTerakhir=0;
+/* bangunkan server selagi karyawan memilih file, supaya unggahan tidak menunggu server "bangun" */
+function panaskan(){ if(window.__TEST_RUN||Date.now()-panasTerakhir<60000) return; panasTerakhir=Date.now(); try{ srv().withSuccessHandler(function(){}).withFailureHandler(function(){}).hasilPost('panaskan'); }catch(e){} }
 function pilihFile(mode){
+  panaskan();
   modePilih=mode; var inp=document.getElementById('fileInv'); inp.value=''; inp.click();
 }
 document.getElementById('fileInv').addEventListener('change',function(){
@@ -1181,23 +1190,99 @@ function ringkasBaca(h){
   if(!ada.length) return '<span class="o">Teks tidak terbaca, isi manual ya.</span>';
   return (h.pasar?h.pasar+': ':'')+'terisi '+ada.join(', ')+'. Cek lagi sebelum simpan.';
 }
+
+/* ---------- tugas latar: kirim formulir walau foto masih diunggah ---------- */
+var TUGAS_KEY='pgnet_sl_tugas', TUGAS=lsGet(TUGAS_KEY,[]), UPLOAD={};
+TUGAS.forEach(function(t){ Object.keys(t).forEach(function(k){ if(k.charAt(0)==='_') delete t[k]; }); });
+function fileSiap(x){ return x&&x.hasil?{fileId:x.hasil.fileId, previewId:x.hasil.previewId||'', mime:x.hasil.mime}:null; }
+function fileJalan(x){ return !!(x && !x.hasil && x.status!=='gagal' && x.upId); }
+function fileOk(x){ return !!(x && (x.status==='siap' || fileJalan(x))); }
+function simpanTugas(){ lsSet(TUGAS_KEY, TUGAS.map(function(t){ var o={}; Object.keys(t).forEach(function(k){ if(k.charAt(0)!=='_') o[k]=t[k]; }); return o; })); }
+function tugasBaru(fn, arg, berkas, label, pesanOk){
+  var t={id:idBaru(), fn:fn, arg:arg, tunggu:{}, label:label, ok:pesanOk, dibuat:Date.now()};
+  Object.keys(berkas||{}).forEach(function(k){ var x=berkas[k]; if(!x) return; if(x.hasil) arg[k]=fileSiap(x); else if(x.upId) t.tunggu[k]=x.upId; });
+  TUGAS.push(t); simpanTugas(); jalankanTugas();
+}
+function hapusTugas(t){ TUGAS=TUGAS.filter(function(x){ return x!==t; }); simpanTugas(); }
+function tugasGagal(t, m){ hapusTugas(t); toast(t.label+' belum terkirim: '+m+' Silakan ulangi.', true); if(KODE&&DATA) muat(true); }
+function pulihUpload(t, k){
+  if(t['_p'+k]) return; t['_p'+k]=1; var coba=0, upId=t.tunggu[k];
+  (function tanya(){
+    srv().withSuccessHandler(function(r){
+      if(r&&r.menunggu&&++coba<25){ setTimeout(tanya,1500); return; }
+      if(r&&r.fileId){ t.arg[k]={fileId:r.fileId, previewId:r.previewId||'', mime:r.mime}; delete t.tunggu[k]; simpanTugas(); jalankanTugas(); }
+      else tugasGagal(t,'foto tidak ditemukan di server.');
+    }).withFailureHandler(function(e){ tugasGagal(t,(e&&e.message)||'foto gagal terunggah.'); }).hasilPost(upId);
+  })();
+}
+function jalankanTugas(){
+  if(!KODE) return;
+  TUGAS.slice().forEach(function(t){
+    if(t._jalan) return;
+    var sisa=0, gagal='';
+    Object.keys(t.tunggu||{}).forEach(function(k){
+      var u=UPLOAD[t.tunggu[k]];
+      if(u){ if(u.hasil){ t.arg[k]=fileSiap(u); delete t.tunggu[k]; } else if(u.status==='gagal') gagal=u.galat||'foto gagal terunggah.'; else sisa++; }
+      else { sisa++; pulihUpload(t,k); }
+    });
+    if(gagal){ tugasGagal(t,gagal); return; }
+    if(sisa) return;
+    t._jalan=true; simpanTugas();
+    srv().withSuccessHandler(function(){ hapusTugas(t); toast(t.ok); muat(true); })
+      .withFailureHandler(function(e){
+        t._jalan=false; var m=(e&&e.message)||String(e); t.coba=(t.coba||0)+1;
+        if(/fetch|jaringan|network|timeout|koneksi|sibuk|internet/i.test(m) && t.coba<5){ simpanTugas(); setTimeout(jalankanTugas,6000); }
+        else tugasGagal(t,m);
+      })[t.fn](t.arg);
+  });
+}
+
+var INV_TUNGGU={};   // unggahan invoice yang masih berjalan, dikunci dengan id unggahan
 function invUntukForm(file){
   var nama=orangAktif(), id=idBaru();
-  S.inv={status:'baca', nama:file.name, mime:file.type}; render();
+  var inv=S.inv={status:'baca', nama:file.name, mime:file.type, upId:id}; INV_TUNGGU[id]=inv; render();
+  function aktif(){ return S.inv===inv; }
   siapkanFile(file).then(function(p){
-    if(!S.inv) return;
-    S.inv.thumb=p.thumb; S.inv.mime=p.mime;
+    inv.thumb=p.thumb; inv.mime=p.mime;
     var h=p.teks?bacaInvoice(p.teks):null;
-    S.inv.status='unggah'; if(h){ S.inv.baca=h; S.inv.info=ringkasBaca(h); }
-    render(); if(h) isiForm(h);
+    inv.status='unggah'; if(h){ inv.baca=h; inv.info=ringkasBaca(h); }
+    if(aktif()){ render(); if(h) isiForm(h); }
     unggah({id:id, orang:nama, nama:file.name, mime:p.mime, data:p.data, preview:p.preview, ocr:!p.teks}, function(e,r){
-      if(!S.inv) return;
-      if(e){ S.inv.status='gagal'; S.inv.galat='Invoice belum tersimpan: '+(e.message||e)+' Tekan × lalu coba lagi.'; render(); return; }
-      S.inv.status='siap'; S.inv.hasil=r;
-      if(!h && r.teks){ var h2=bacaInvoice(r.teks); S.inv.baca=h2; S.inv.info=ringkasBaca(h2); render(); isiForm(h2); }
-      else { if(!h) S.inv.info='<span class="o">Teks screenshot tidak terbaca, isi manual ya.</span>'; render(); }
+      if(e){ inv.status='gagal'; inv.galat='Invoice belum tersimpan: '+(e.message||e)+' Tekan × lalu coba lagi.'; if(aktif()) render(); lepasTunggu(id); return; }
+      inv.status='siap'; inv.hasil=r;
+      if(!h && r.teks){ var h2=bacaInvoice(r.teks); inv.baca=h2; inv.info=ringkasBaca(h2); if(aktif()){ render(); isiForm(h2); } }
+      else { if(!h) inv.info='<span class="o">Teks screenshot tidak terbaca, isi manual ya.</span>'; if(aktif()) render(); }
+      lepasTunggu(id);
     });
-  }).catch(function(e){ if(S.inv){ S.inv.status='gagal'; S.inv.galat=e.message||String(e); render(); } });
+  }).catch(function(e){ inv.status='gagal'; inv.galat=e.message||String(e); if(aktif()) render(); lepasTunggu(id); });
+}
+/* invoice selesai (atau gagal) → pasang ke pembelian di antrean yang menunggunya, lalu kirim */
+function lepasTunggu(id){
+  var inv=INV_TUNGGU[id], ada=false;
+  ANTRE.forEach(function(a){
+    if(a.lampTunggu!==id) return; ada=true; delete a.lampTunggu;
+    if(inv && inv.status==='siap' && inv.hasil){ a.lampiran={fileId:inv.hasil.fileId, previewId:inv.hasil.previewId||'', mime:inv.hasil.mime}; if(!a.totalInv && inv.baca && inv.baca.total) a.totalInv=inv.baca.total; }
+    else pasangGagal(a);
+  });
+  if(S.inv!==inv) delete INV_TUNGGU[id];
+  if(ada){ lsSet(ANTRE_KEY,ANTRE); render(); kirimAntre(); }
+}
+function pasangGagal(a){
+  a.lampiran=null;
+  if(a.danaId){ a.gagal='Invoice gagal terunggah, jadi dana belum bisa ditutup. Hapus catatan ini lalu catat ulang dengan invoice.'; a.permanen=true; a.gagalPada=Date.now(); }
+  else toast('Pembelian '+a.no+' tetap disimpan, tapi invoicenya gagal terunggah. Lampirkan ulang dari daftar barang.',true);
+}
+/* halaman sempat ditutup saat invoice masih diunggah: ambil hasilnya dari server */
+function pulihkanTunggu(a){
+  if(a._pulih) return; a._pulih=true; var coba=0;
+  (function tanya(){
+    srv().withSuccessHandler(function(r){
+      if(r&&r.menunggu&&++coba<20){ setTimeout(tanya,1500); return; }
+      delete a.lampTunggu; delete a._pulih;
+      if(r&&r.fileId) a.lampiran={fileId:r.fileId, previewId:r.previewId||'', mime:r.mime}; else pasangGagal(a);
+      lsSet(ANTRE_KEY,ANTRE); render(); kirimAntre();
+    }).withFailureHandler(function(){ delete a.lampTunggu; delete a._pulih; pasangGagal(a); lsSet(ANTRE_KEY,ANTRE); render(); kirimAntre(); }).hasilPost(a.lampTunggu);
+  })();
 }
 function invUntukItem(file, mode){
   var b=mode.b, id=idBaru();
@@ -1402,14 +1487,14 @@ function pasangFormTrf(){
   var n=f.querySelector('[name=nominal]'); if(n) n.addEventListener('input',function(){ var v=n.value.replace(/\D/g,''); n.value=v?'Rp'+(+v).toLocaleString('id-ID'):''; });
 }
 function unggahFileTrf(file, tujuan, orang){
-  var id=idBaru(); tujuan.status='unggah'; tujuan.nama=file.name; render();
+  var id=idBaru(); tujuan.status='unggah'; tujuan.nama=file.name; tujuan.upId=id; UPLOAD[id]=tujuan; render();
   siapkanFile(file).then(function(p){
     tujuan.thumb=p.thumb; tujuan.mime=p.mime; render();
     unggah({id:id, orang:orang, nama:file.name, mime:p.mime, data:p.data, preview:p.preview, ocr:false}, function(e,r){
-      if(e){ tujuan.status='gagal'; tujuan.galat='Belum tersimpan: '+(e.message||e); render(); return; }
-      tujuan.status='siap'; tujuan.hasil={fileId:r.fileId, previewId:r.previewId||'', mime:r.mime}; render();
+      if(e){ tujuan.status='gagal'; tujuan.galat='Belum tersimpan: '+(e.message||e); render(); jalankanTugas(); return; }
+      tujuan.status='siap'; tujuan.hasil={fileId:r.fileId, previewId:r.previewId||'', mime:r.mime}; render(); jalankanTugas();
     });
-  }).catch(function(e){ tujuan.status='gagal'; tujuan.galat=e.message||String(e); render(); });
+  }).catch(function(e){ tujuan.status='gagal'; tujuan.galat=e.message||String(e); render(); jalankanTugas(); });
 }
 function kirimTrf(){
   ambilFormTrf(); var f=S.ftrf; if(!f||f.jalan) return;
@@ -1639,7 +1724,7 @@ function formAjuHtml(){
   h+= v ? '<div class="aju-foto">'+(v.thumb?'<img src="'+v.thumb+'">':'<div class="pdf">IMG</div>')+'<div class="tx">'+(v.status==='siap'?'<span class="g">✓ Screenshot tersimpan</span>':v.status==='gagal'?'<span class="m">'+esc(v.galat)+'</span>':'<span class="o">Menyimpan…</span>')+'<button data-ajufilehapus>Ganti foto</button></div></div>'
     : '<button class="aju-ambil" data-ajufile><span class="i">📷</span><b>Pilih screenshot barang</b><small>Screenshot halaman barang di Shopee / Tokopedia, lengkap dengan harganya.</small></button>';
   h+='<label>Keterangan</label><textarea name="keterangan" rows="3" placeholder="cth. SSD NVMe 1TB 100%, harga 1,48 jt, mau nego dulu">'+esc(f.keterangan||'')+'</textarea>';
-  h+='<div class="pesan">'+esc(f.galat||'')+'</div><button class="btn" data-kirimaju'+(f.jalan||(v&&v.status==='unggah')?' disabled>'+(f.jalan?'Mengirim…':'Menunggu foto…'):'>Kirim ke Hani')+'</button></div>';
+  h+='<div class="pesan">'+esc(f.galat||'')+'</div><button class="btn" data-kirimaju'+(f.jalan?' disabled>Mengirim…':'>Kirim ke Hani')+'</button></div>';
   return h;
 }
 function formIncHtml(){
@@ -1671,8 +1756,12 @@ function pasangFormAju(){
 function kirimAju(){
   ambilFormAju(); var f=S.faju; if(!f||f.jalan) return;
   f.galat='';
-  if(!(f.file&&f.file.hasil)) f.galat='Pilih screenshot barangnya dulu.';
+  if(!fileOk(f.file)) f.galat='Pilih screenshot barangnya dulu.';
   if(f.galat){ render(); return; }
+  if(fileJalan(f.file)){
+    tugasBaru('ajukanSetuju',{id:f.id, keterangan:String(f.keterangan||'').trim(), incaran:f.incaran||''},{lampiran:f.file},'Pengajuan','Pengajuan dikirim ke Hani');
+    S.faju=null; S.lembar=null; toast('Dikirim. Foto masih diunggah, nanti sampai ke Hani otomatis.'); render(); return;
+  }
   f.jalan=true; render();
   srv().withSuccessHandler(function(){ S.faju=null; S.lembar=null; toast('Pengajuan dikirim ke Hani'); muat(true); })
     .withFailureHandler(function(e){ f.jalan=false; f.galat=e.message||String(e); render(); })
@@ -1859,7 +1948,7 @@ function muat(diam){
     S.memuat=false; S.galat=null;
     d._waktu=new Date().toISOString(); DATA=d; simpanData();
     if(S.lihat && !DATA.orang[S.lihat]) S.lihat=null;
-    setBadge(); render(); kirimAntre(); pakaiBagikan();
+    setBadge(); render(); kirimAntre(); jalankanTugas(); pakaiBagikan();
   }).withFailureHandler(function(e){
     S.memuat=false; S.galat=(e&&e.message)||String(e); render();
   }).getData();
@@ -1902,7 +1991,7 @@ document.getElementById('app').addEventListener('click',function(e){
   if(d.filter){ S.filter=d.filter; }
   else if(d.lipat){ S.buka[d.lipat]=!S.buka[d.lipat]; }
   else if(d.bulan){ S.buka['b'+d.bulan]=!S.buka['b'+d.bulan]; }
-  else if(t.hasAttribute('data-bukacatat')){ S.lembar='catat'; S.anim=true; }
+  else if(t.hasAttribute('data-bukacatat')){ S.lembar='catat'; S.anim=true; panaskan(); }
   else if(t.hasAttribute('data-bukakomisi')){ S.lembar='komisi'; S.anim=true; }
   else if(t.hasAttribute('data-tutup')||t.hasAttribute('data-tirai')){ if(S.dialog&&S.dialog.jalan) return; if(S.dialog) S.dialog=null; else { S.lembar=null; S.lihat_inv=null; } }
   else if(t.hasAttribute('data-muat')){ muat(); return; }
@@ -1969,6 +2058,10 @@ function mintaGanti(k){
 }
 function tandaiBatal(){
   var dl=S.dialog; if(!dl||dl.jalan) return;
+  if(fileJalan(dl.bukti)||fileJalan(dl.buktiTf)){
+    tugasBaru('tandaiBatal',{id:dl.id, orang:dl.orang, baris:dl.b[7], no:dl.b[2]},{bukti:dl.bukti,buktiTf:dl.buktiTf},'Pembatalan '+namaToko(dl.b[3]),namaToko(dl.b[3])+' ditandai dibatalkan');
+    dl.b[5]='Dibatalkan'; S.dialog=null; S.aksi=null; simpanData(); toast('Ditandai dibatalkan. Bukti masih diunggah, nanti tersimpan otomatis.'); render(); return;
+  }
   dl.jalan=true; dl.galat=null; render();
   srv().withSuccessHandler(function(r){
     dl.b[5]='Dibatalkan'; if(dl.bukti&&dl.bukti.hasil){ var ob=DATA.orang[dl.orang]; (ob.buktiBatal=ob.buktiBatal||{})[normNo(dl.b[2])]=[dl.bukti.hasil.mime]; } if(dl.buktiTf&&dl.buktiTf.hasil){ var ot=DATA.orang[dl.orang]; (ot.buktiTfBatal=ot.buktiTfBatal||{})[normNo(dl.b[2])]=[dl.buktiTf.hasil.mime]; } S.dialog=null; S.aksi=null; simpanData();
@@ -1979,6 +2072,10 @@ function tandaiBatal(){
 }
 function cairkan(){
   var dl=S.dialog; if(!dl||dl.jalan) return;
+  if(fileJalan(dl.bukti)){
+    tugasBaru('cairkan',{id:dl.id, orang:dl.orang, nominal:dl.nominal},{bukti:dl.bukti},'Pencairan komisi '+dl.orang,'Komisi '+dl.orang+' '+rp(dl.nominal)+' dicatat sudah cair');
+    S.dialog=null; S.lembar=null; toast('Dicatat. Bukti masih diunggah, nanti tersimpan otomatis.'); render(); return;
+  }
   dl.jalan=true; dl.galat=null; render();
   srv().withSuccessHandler(function(r){
     S.dialog=null; S.lembar=null;
@@ -1995,7 +2092,7 @@ setBadge(); render();
 if(KODE){ muat(!!DATA); }
 ambilBagikan().then(pakaiBagikan);
 setInterval(function(){ if(document.visibilityState==='visible' && KODE && DATA) muat(true); }, 5*60000);
-document.addEventListener('visibilitychange',function(){ if(document.visibilityState==='visible' && KODE && DATA){ muat(true); kirimAntre(); } });
+document.addEventListener('visibilitychange',function(){ if(document.visibilityState==='visible' && KODE && DATA){ muat(true); kirimAntre(); jalankanTugas(); } });
 setInterval(function(){ if(DATA && !S.lembar && !S.dialog && document.activeElement.id!=='cari') render(); }, 60000);
 </script>
 </body>
