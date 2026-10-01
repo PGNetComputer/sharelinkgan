@@ -947,7 +947,34 @@ function render(){
   if(ct){ ct.addEventListener('input',function(){ S.timCari=ct.value; var q=ct.value.toLowerCase(), f=S.timF||{}; document.getElementById('daftarTim').innerHTML=daftarTimHtml(TIM.item.filter(function(x){ return (!f.orang||x[1]===f.orang)&&(!f.pl||x[2]===f.pl)&&(!f.kat||x[3]===f.kat)&&(!q||(x[4]+' '+x[7]).toLowerCase().indexOf(q)>=0); })); }); if(fokusTim){ ct.focus(); ct.setSelectionRange(ct.value.length,ct.value.length);} }
   pasangForm(formLama); pasangFormTrf(); pasangFormAju(); pasangKode(); muatGambarAju();
   S.anim=false;
+  sinkronRiwayat();
 }
+/* ---------- tombol KEMBALI di HP: tutup satu lapis, bukan keluar aplikasi ---------- */
+var RIWAYAT=0, ABAIKAN_POP=0;
+function kedalaman(){
+  if(!KODE||!DATA) return 0;
+  var n=0; if(S.tab!=='barang') n++; if(S.lihat) n++; if(S.lembar) n++; if(S.dialog) n++; if(document.querySelector('.foto-penuh')) n++;
+  return n;
+}
+function sinkronRiwayat(){
+  try{
+    var d=kedalaman();
+    while(RIWAYAT<d){ history.pushState({sl:RIWAYAT+1},''); RIWAYAT++; }
+    if(RIWAYAT>d){ var k=RIWAYAT-d; RIWAYAT=d; ABAIKAN_POP++; history.go(-k); }
+  }catch(e){}
+}
+function tutupSatuLapis(){
+  var fp=document.querySelector('.foto-penuh'); if(fp){ fp.remove(); return; }
+  if(S.dialog){ if(S.dialog.jalan) return; S.dialog=null; return; }
+  if(S.lembar){ S.lembar=null; S.lihat_inv=null; return; }
+  if(S.lihat){ S.lihat=null; return; }
+  if(S.tab!=='barang'){ S.tab='barang'; return; }
+}
+window.addEventListener('popstate',function(){
+  if(ABAIKAN_POP>0){ ABAIKAN_POP--; return; }
+  RIWAYAT=Math.max(0,RIWAYAT-1);
+  tutupSatuLapis(); render();
+});
 function ambilForm(){
   var f=document.getElementById('formCatat'); if(!f) return null; var o={};
   f.querySelectorAll('input').forEach(function(i){ if(i.type==='radio'){ if(i.checked) o[i.name]=i.value; } else o[i.name]=i.type==='checkbox'?i.checked:i.value; }); o._fokus=document.activeElement&&document.activeElement.name; return o;
@@ -1228,7 +1255,7 @@ function thumbKlik(x, isi){ var k=x&&x.upId&&x.lokal?x.upId:''; return k?'<butto
 function lihatLokal(id){
   var x=UPLOAD[id]||INV_TUNGGU[id]; if(!x||!x.lokal) return;
   var o=document.createElement('div'); o.className='foto-penuh'; o.innerHTML='<img src="'+x.lokal+'" alt="Screenshot"><button aria-label="Tutup">×</button>';
-  o.addEventListener('click',function(){ o.remove(); }); document.body.appendChild(o);
+  o.addEventListener('click',function(){ o.remove(); sinkronRiwayat(); }); document.body.appendChild(o); sinkronRiwayat();
 }
 function fileSiap(x){ return x&&x.hasil?{fileId:x.hasil.fileId, previewId:x.hasil.previewId||'', mime:x.hasil.mime}:null; }
 function fileJalan(x){ return !!(x && !x.hasil && x.status!=='gagal' && x.upId); }
