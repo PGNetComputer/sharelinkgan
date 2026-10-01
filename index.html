@@ -1314,11 +1314,11 @@ function invUntukForm(file){
   var nama=orangAktif(), id=idBaru();
   var dPilih=new Date(), jamPilih=('0'+dPilih.getHours()).slice(-2)+':'+('0'+dPilih.getMinutes()).slice(-2);
   var inv=S.inv={status:'baca', nama:file.name, mime:file.type, upId:id, membaca:true}; INV_TUNGGU[id]=inv; render();
-  function lengkapi(h){ if(h && !h.jam && !/pdf/i.test(inv.mime||'')) h.jam=jamPilih; return h; }   // screenshot tanpa jam → pakai jam saat diunggah
+  function lengkapi(h){ if(h && !h.jam) h.jam=jamPilih; return h; }   // invoice/screenshot tanpa jam → pakai jam saat diunggah
   function aktif(){ return S.inv===inv; }
   siapkanFile(file).then(function(p){
     inv.thumb=p.thumb; inv.mime=p.mime; inv.lokal=lokalDari(p);
-    var h=p.teks?bacaInvoice(p.teks):null;
+    var h=p.teks?lengkapi(bacaInvoice(p.teks)):null;
     inv.status='unggah'; if(h){ inv.baca=h; inv.info=ringkasBaca(h); inv.membaca=false; }
     if(aktif()){ render(); if(h) isiForm(h); }
     var pisah=!p.teks && bisaPost();
