@@ -2005,14 +2005,18 @@ function simpanData(){ lsSet(DATA_KEY,DATA); }
 function muat(diam, segar){
   if(!KODE||S.memuat) return;
   S.memuat=true; if(!diam) S.galat=null; render();
+  // tanya dulu "ada perubahan?" — kalau tidak, server tidak perlu membaca spreadsheet sama sekali.
+  // Paling lama 10 menit sekali tetap ambil penuh (untuk perubahan dari luar aplikasi, mis. barang datang).
+  var penuh=segar || !DATA || !DATA.ver || !DATA._penuh || (Date.now()-DATA._penuh>10*60000);
   srv().withSuccessHandler(function(d){
     S.memuat=false; S.galat=null;
-    d._waktu=new Date().toISOString(); DATA=d; terapkanTugas(); simpanData();
+    if(d && d.tetap && DATA){ DATA._waktu=new Date().toISOString(); simpanData(); setBadge(); render(); kirimAntre(); jalankanTugas(); return; }
+    d._waktu=new Date().toISOString(); d._penuh=Date.now(); DATA=d; terapkanTugas(); simpanData();
     if(S.lihat && !DATA.orang[S.lihat]) S.lihat=null;
     setBadge(); render(); kirimAntre(); jalankanTugas(); pakaiBagikan();
   }).withFailureHandler(function(e){
     S.memuat=false; S.galat=(e&&e.message)||String(e); render();
-  }).getData(segar?{segar:1}:{});
+  }).getData(segar?{segar:1}:penuh?{}:{ver:DATA.ver});
 }
 function kodeDitolak(){
   KODE=''; lsDel(KODE_KEY); DATA=null; lsDel(DATA_KEY); S.memuat=false; kirimJalan=false;
