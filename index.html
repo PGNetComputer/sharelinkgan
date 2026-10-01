@@ -489,6 +489,11 @@ button,input,textarea{font-family:inherit}
 .foto-penuh{position:fixed;inset:0;background:rgba(20,18,15,.92);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px}
 .foto-penuh img{max-width:100%;max-height:100%;object-fit:contain;border-radius:8px;background:#fff}
 .foto-penuh button{position:absolute;top:12px;right:14px;width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.15);color:#fff;font-size:24px;border:0}
+
+.putar{display:inline-block;width:12px;height:12px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;margin-right:6px;vertical-align:-1px;animation:putar .8s linear infinite}
+@keyframes putar{to{transform:rotate(360deg)}}
+.form.membaca input[name=tgl],.form.membaca input[name=jam],.form.membaca input[name=no],.form.membaca input[name=penjual],.form.membaca input[name=harga]{background:linear-gradient(90deg,#f3efe8 25%,#faf7f1 50%,#f3efe8 75%);background-size:200% 100%;animation:kilau 1.2s linear infinite}
+@keyframes kilau{to{background-position:-200% 0}}
 </style>
 </head>
 <body>
@@ -749,6 +754,7 @@ function invStatusHtml(){
   var v=S.inv; if(!v) return '<button class="inv-btn" data-pilihinv><span class="i">📎</span><span><b>Ambil dari invoice</b><small>PDF atau screenshot Shopee / Tokopedia / Toco. Isian terisi otomatis.</small></span></button>';
   var gb=thumbKlik(v, v.thumb?'<img src="'+v.thumb+'">':'<div class="pdf">'+(v.mime==='application/pdf'?'PDF':'IMG')+'</div>'), tx;
   if(v.status==='gagal') tx='<span class="m">'+esc(v.galat)+'</span>';
+  else if(v.membaca) tx='<span class="o"><i class="putar"></i>'+(/pdf/i.test(v.mime||'')||/\.pdf$/i.test(v.nama||'')?'Membaca invoice…':'Membaca isi screenshot…')+'</span><br><span style="font-size:12px;color:var(--abu)">Isian terisi otomatis sebentar lagi.</span>';
   else tx='<span class="g">✓ Invoice terlampir</span>'+(v.info?'<br>'+v.info:'');
   return '<div class="inv-status">'+gb+'<div class="tx">'+esc(v.nama||'')+'<br>'+tx+'</div><button class="x" data-hapusinv aria-label="Hapus invoice">×</button></div>';
 }
@@ -760,7 +766,7 @@ function formDanaHtml(aju){
   var f=S.fdana||(S.fdana={id:idBaru()}), v=f.file;
   var h='<div class="form" id="formDana">'+pilihModeHtml('dana')
     +(aju?'<div class="dana-info" style="background:#f6eee6;color:#8a5a3b">👍 Dari pengajuan: '+esc(aju.barang)+'</div>':'')
-    +'<div class="dana-info">1. Kirim screenshot pesanan yang belum dibayar (yang ada <b>Total Pembayaran</b>-nya).<br>2. '+esc(petugasNama())+' transfer & kirim bukti.<br>3. Bayar ke penjual, lalu lampirkan invoice PDF-nya.</div>';
+    +'<div class="dana-info">1. Kirim screenshot pesanan yang belum dibayar (yang ada <b>Total Pembayaran</b>-nya).<br>2. '+esc(petugasNama())+' transfer & kirim bukti.<br>3. Bayar ke penjual, lalu lampirkan invoice PDF atau screenshot <b>Rincian Pesanan</b> (yang ada No. Pesanan-nya).</div>';
   h+= v ? '<div class="aju-foto">'+thumbKlik(v, v.thumb?'<img src="'+v.thumb+'">':'<div class="pdf">IMG</div>')+'<div class="tx">'+(v.status==='gagal'?'<span class="m">'+esc(v.galat)+'</span>':'<span class="g">✓ Screenshot terlampir</span><span style="font-weight:600;font-size:12px;color:var(--abu)">Ketuk gambar untuk melihat</span>')+'<button data-danafilehapus>Ganti foto</button></div></div>'
     : '<button class="aju-ambil" data-danafile><span class="i">📷</span><b>Pilih screenshot pesanan</b><small>Halaman “Rincian Pesanan” yang masih “Bayar dalam …”.</small></button>';
   h+='<label>Total pembayaran</label><input name="nominal" inputmode="numeric" placeholder="Ketik total, cth. 1.350.000" value="'+esc(f.nominal||'')+'">'
@@ -797,7 +803,7 @@ function formHtml(){
   var dana=S.danaId&&daftarTrf().find(function(t){return t.id===S.danaId;});
   var aju=S.setujuId&&daftarAju().find(function(a){return a.id===S.setujuId;});
   if(!dana && !isAdmin() && S.catatMode==='dana') return formDanaHtml(aju);
-  return '<div class="form" id="formCatat">'+(dana||isAdmin()?'':pilihModeHtml('ganti'))+(aju?'<div class="dana-info" style="background:#f6eee6;color:#8a5a3b">👍 Dari pengajuan: '+esc(aju.barang)+' · '+rp(aju.harga)+'</div>':'')+(dana?'<div class="dana-info">🏦 Untuk dana '+rp(dana.nominal)+' dari '+esc(dana.trfOleh||petugasNama())+(dana.penjual?' · '+esc(dana.penjual):'')+'. Lampirkan invoice supaya permintaan ini selesai.</div>':'')+'<div id="invBox">'+invStatusHtml()+'</div>'
+  return '<div class="form'+(S.inv&&S.inv.membaca&&S.inv.status!=='gagal'?' membaca':'')+'" id="formCatat">'+(dana||isAdmin()?'':pilihModeHtml('ganti'))+(aju?'<div class="dana-info" style="background:#f6eee6;color:#8a5a3b">👍 Dari pengajuan: '+esc(aju.barang)+' · '+rp(aju.harga)+'</div>':'')+(dana?'<div class="dana-info">🏦 Untuk dana '+rp(dana.nominal)+' dari '+esc(dana.trfOleh||petugasNama())+(dana.penjual?' · '+esc(dana.penjual):'')+'. Lampirkan invoice supaya permintaan ini selesai.</div>':'')+'<div id="invBox">'+invStatusHtml()+'</div>'
    +'<div class="dua"><div><label>Tanggal beli</label><input type="date" name="tgl" value="'+hariIni()+'"></div><div><label>Jam</label><input type="time" name="jam"></div></div>'
    +'<label>No. Pesanan</label><input name="no" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="cth. 260930ABC123XYZ" style="font-family:ui-monospace,Menlo,monospace;text-transform:uppercase">'
    +'<div class="pesan" id="pesanNo"></div>'
@@ -825,7 +831,7 @@ function halamanOrang(nama){
   var h=kepala(admin?esc(nama):'Halo, '+esc(nama), admin?'Dilihat oleh Hani · '+subPerbarui():subPerbarui(), admin?'<button class="ikon-btn" data-kembali style="color:var(--hijau);font-weight:800">←</button>':null)
     +'<div class="isi" id="isiUtama">'
     +(admin?'':daftarTrf().filter(function(t){ return t.orang===nama && t.status==='Menunggu invoice'; }).map(function(t){
-        return '<div class="dana-tunggu"><div><b>🏦 Dana '+rp(t.nominal)+' sudah ditransfer'+(t.trfOleh?' '+esc(t.trfOleh):'')+'</b><span>'+(t.penjual?esc(t.penjual)+' · ':'')+'Setelah bayar ke penjual, lampirkan invoice PDF-nya.</span></div>'
+        return '<div class="dana-tunggu"><div><b>🏦 Dana '+rp(t.nominal)+' sudah ditransfer'+(t.trfOleh?' '+esc(t.trfOleh):'')+'</b><span>'+(t.penjual?esc(t.penjual)+' · ':'')+'Setelah bayar ke penjual, lampirkan invoice PDF atau screenshot Rincian Pesanan.</span></div>'
           +'<div class="aksi-item">'+(t.bukti?'<button data-trflihat="'+esc(t.id)+'|bukti">🧾 Bukti transfer</button>':'')+'<button class="hijau" data-trfinv="'+esc(t.id)+'">📎 Lampirkan invoice</button></div></div>'; }).join(''))
     +kartuKomisi(nama, r.sekarang)
     +'<div class="hitung">'+hit.map(function(x){return '<button data-filter="'+(S.filter===x[0]?'semua':x[0])+'" class="'+(S.filter===x[0]?'on':'')+'"><div class="a" style="color:'+x[3]+'">'+x[2]+'</div><div class="t">'+x[1]+'</div></button>';}).join('')+'</div>'
@@ -1076,6 +1082,25 @@ function bacaInvoice(teks){
   else if((m=T.match(/\b(\d{2})[\/\-](\d{2})[\/\-](20\d{2})\b/))) h.tgl=m[3]+'-'+m[2]+'-'+m[1];
   else if((m=T.match(/\b(20\d{2})[\/\-](\d{2})[\/\-](\d{2})\b/))) h.tgl=m[1]+'-'+m[2]+'-'+m[3];
   if((m=T.match(/\b([01]?\d|2[0-3])[:.]([0-5]\d)(?::\d{2})?\s*(WIB)?\b/)) && !/\d[:.]\d{2}[:.]\d{2}[:.]/.test(m[0])) h.jam=pad2(+m[1])+':'+m[2];
+  // --- screenshot "Rincian Pesanan" Shopee (sebelum transaksi selesai belum ada PDF) ---
+  if(/RINCIAN PESANAN/.test(T) && !/NOTA PESANAN/.test(T) && (!h.pasar||h.pasar==='Shopee')){
+    if(!h.pasar) h.pasar='Shopee';
+    // nama toko = baris pendek pertama setelah blok "Alamat Pengiriman" (lewati nama+HP, alamat, "Ubah"/"Lihat")
+    var mulai=-1; for(var q=0;q<baris.length;q++){ if(/ALAMAT PENGIRIMAN/i.test(baris[q])){ mulai=q+1; break; } }
+    if(mulai<0) mulai=0;
+    for(var q2=mulai;q2<baris.length && !h.penjual;q2++){
+      var c=baris[q2].replace(/^[^A-Za-z0-9]+/,'').replace(/\s*[>›»〉]+\s*$/,'').trim();
+      c=c.replace(/^(?:STAR\s*\+?|STAR\s+PLUS|SHOPEE\s+MALL|MALL|PREFERRED\s*\+?|PILIHAN)\s+/i,'').trim();
+      if(/RP\s*\d|TOTAL|NO\.?\s*PESANAN|BUTUH BANTUAN/i.test(c)) break;           // sudah lewat bagian toko
+      if(c.length<2 || c.length>40) continue;
+      if(/,|\d{4,}|\+62|\(\s*62|^(UBAH|LIHAT|SALIN)$/i.test(c)) continue;
+      if(/\b(RT|RW|KAB|KEC|KOTA|KEL|JL|JLN|GG|GANG|DESA|PERUMAHAN|BLOK|NO|JAWA|ID)\b\.?/i.test(c)) continue;
+      h.penjual=c;
+    }
+    // tanggal beli dari No. Pesanan Shopee (YYMMDD...), bukan dari jam HP / jadwal kirim
+    if(h.no && (m=h.no.match(/^(\d{2})(\d{2})(\d{2})/)) && +m[2]>=1 && +m[2]<=12) h.tgl='20'+m[1]+'-'+m[2]+'-'+m[3];
+    h.jam='';
+  }
   return h;
 }
 if(typeof module!=='undefined') module.exports={bacaInvoice:bacaInvoice};
@@ -1209,10 +1234,19 @@ function fileSiap(x){ return x&&x.hasil?{fileId:x.hasil.fileId, previewId:x.hasi
 function fileJalan(x){ return !!(x && !x.hasil && x.status!=='gagal' && x.upId); }
 function fileOk(x){ return !!(x && (x.status==='siap' || fileJalan(x))); }
 function simpanTugas(){ lsSet(TUGAS_KEY, TUGAS.map(function(t){ var o={}; Object.keys(t).forEach(function(k){ if(k.charAt(0)!=='_') o[k]=t[k]; }); return o; })); }
-function tugasBaru(fn, arg, berkas, label, pesanOk){
-  var t={id:idBaru(), fn:fn, arg:arg, tunggu:{}, label:label, ok:pesanOk, dibuat:Date.now()};
+function tugasBaru(fn, arg, berkas, label, pesanOk, optimis){
+  var t={id:idBaru(), fn:fn, arg:arg, tunggu:{}, label:label, ok:pesanOk, dibuat:Date.now(), optimis:optimis||null};
   Object.keys(berkas||{}).forEach(function(k){ var x=berkas[k]; if(!x) return; if(x.hasil) arg[k]=fileSiap(x); else if(x.upId) t.tunggu[k]=x.upId; });
   TUGAS.push(t); simpanTugas(); jalankanTugas();
+}
+/* data baru dari server belum tahu tugas yang masih berjalan → tampilkan hasilnya duluan */
+function terapkanTugas(){
+  if(!DATA) return;
+  TUGAS.forEach(function(t){
+    var o=t.optimis; if(!o) return;
+    if(o.trf){ var x=(DATA.transfer||[]).find(function(z){ return z.id===o.trf; }); if(x && (x.status==='Perlu ditransfer'||x.status==='Perlu dicek masuk')){ x.status=o.status; x.trfOleh=o.oleh; x.trfPada=o.pada; } }
+    if(o.batal){ var ob=DATA.orang[o.batal.orang]; if(ob) ob.beli.forEach(function(b){ if(normNo(b[2])===normNo(o.batal.no)) b[5]='Dibatalkan'; }); }
+  });
 }
 function hapusTugas(t){ TUGAS=TUGAS.filter(function(x){ return x!==t; }); simpanTugas(); }
 function tugasGagal(t, m){ hapusTugas(t); toast(t.label+' belum terkirim: '+m+' Silakan ulangi.', true); if(KODE&&DATA) muat(true); }
@@ -1251,29 +1285,32 @@ function jalankanTugas(){
 var INV_TUNGGU={};   // unggahan invoice yang masih berjalan, dikunci dengan id unggahan
 function invUntukForm(file){
   var nama=orangAktif(), id=idBaru();
-  var inv=S.inv={status:'baca', nama:file.name, mime:file.type, upId:id}; INV_TUNGGU[id]=inv; render();
+  var dPilih=new Date(), jamPilih=('0'+dPilih.getHours()).slice(-2)+':'+('0'+dPilih.getMinutes()).slice(-2);
+  var inv=S.inv={status:'baca', nama:file.name, mime:file.type, upId:id, membaca:true}; INV_TUNGGU[id]=inv; render();
+  function lengkapi(h){ if(h && !h.jam && !/pdf/i.test(inv.mime||'')) h.jam=jamPilih; return h; }   // screenshot tanpa jam → pakai jam saat diunggah
   function aktif(){ return S.inv===inv; }
   siapkanFile(file).then(function(p){
     inv.thumb=p.thumb; inv.mime=p.mime; inv.lokal=lokalDari(p);
     var h=p.teks?bacaInvoice(p.teks):null;
-    inv.status='unggah'; if(h){ inv.baca=h; inv.info=ringkasBaca(h); }
+    inv.status='unggah'; if(h){ inv.baca=h; inv.info=ringkasBaca(h); inv.membaca=false; }
     if(aktif()){ render(); if(h) isiForm(h); }
     var pisah=!p.teks && bisaPost();
     if(pisah){
       unggah({id:idBaru(), mime:p.mime, data:p.data}, function(e2,r2){
-        var t2=!e2&&r2&&r2.teks; if(t2){ var h3=bacaInvoice(t2); inv.baca=h3; inv.info=ringkasBaca(h3); if(aktif()){ render(); isiForm(h3); }
+        inv.membaca=false;
+        var t2=!e2&&r2&&r2.teks; if(t2){ var h3=lengkapi(bacaInvoice(t2)); inv.baca=h3; inv.info=ringkasBaca(h3); if(aktif()){ render(); isiForm(h3); }
           ANTRE.forEach(function(a){ if((a.lampTunggu===id||(a.lampiran&&inv.hasil&&a.lampiran.fileId===inv.hasil.fileId)) && !a.totalInv && h3.total) a.totalInv=h3.total; }); }
         else { inv.info='<span class="o">Teks screenshot tidak terbaca, isi manual ya.</span>'; if(aktif()) render(); }
       }, 'bacaGambar');
     }
     unggah({id:id, orang:nama, nama:file.name, mime:p.mime, data:p.data, preview:p.preview, ocr:!p.teks && !pisah}, function(e,r){
-      if(e){ inv.status='gagal'; inv.galat='Invoice belum tersimpan: '+(e.message||e)+' Tekan × lalu coba lagi.'; if(aktif()) render(); lepasTunggu(id); return; }
-      inv.status='siap'; inv.hasil=r;
-      if(!h && r.teks){ var h2=bacaInvoice(r.teks); inv.baca=h2; inv.info=ringkasBaca(h2); if(aktif()){ render(); isiForm(h2); } }
+      if(e){ inv.status='gagal'; inv.membaca=false; inv.galat='Invoice belum tersimpan: '+(e.message||e)+' Tekan × lalu coba lagi.'; if(aktif()) render(); lepasTunggu(id); return; }
+      inv.status='siap'; inv.hasil=r; if(!pisah) inv.membaca=false;
+      if(!h && r.teks){ var h2=lengkapi(bacaInvoice(r.teks)); inv.baca=h2; inv.info=ringkasBaca(h2); if(aktif()){ render(); isiForm(h2); } }
       else { if(!h && !pisah) inv.info='<span class="o">Teks screenshot tidak terbaca, isi manual ya.</span>'; if(aktif()) render(); }
       lepasTunggu(id);
     });
-  }).catch(function(e){ inv.status='gagal'; inv.galat=e.message||String(e); if(aktif()) render(); lepasTunggu(id); });
+  }).catch(function(e){ inv.status='gagal'; inv.membaca=false; inv.galat=e.message||String(e); if(aktif()) render(); lepasTunggu(id); });
 }
 /* invoice selesai (atau gagal) → pasang ke pembelian di antrean yang menunggunya, lalu kirim */
 function lepasTunggu(id){
@@ -1408,7 +1445,7 @@ function kartuTrf(t, mode){
   if(mode!=='proses' && st==='Menunggu invoice') tb.push('<button class="hijau" data-trfinv="'+esc(t.id)+'">📎 Lampirkan invoice</button>');
   if(mode!=='proses' && t.jenis==='Minta dana' && st==='Selesai' && t.selisih>0 && sisaDana().indexOf(t)>=0) tb.push('<button data-refund="'+esc(t.id)+'">↩ Kembalikan sisa '+rp(t.selisih)+'</button>');
   if(tb.length) h+='<div class="aksi-item">'+tb.join('')+'</div>';
-  if(mode!=='proses' && st==='Menunggu invoice') h+='<div class="tebak" style="background:#e6effa;color:#1f5fa8">Dana sudah masuk ke rekeningmu. Setelah bayar ke penjual, lampirkan invoice PDF-nya supaya pembelian tercatat dan permintaan ini selesai.</div>';
+  if(mode!=='proses' && st==='Menunggu invoice') h+='<div class="tebak" style="background:#e6effa;color:#1f5fa8">Dana sudah masuk ke rekeningmu. Setelah bayar ke penjual, lampirkan invoice PDF atau screenshot Rincian Pesanan supaya pembelian tercatat dan permintaan ini selesai.</div>';
   return h+'</div>';
 }
 function kelompok(judul, arr, mode, kunci){
@@ -1560,8 +1597,8 @@ function prosesTrf(aksi){
   var d=S.dialog; if(!d||d.jalan) return;
   if(aksi==='tolak'){ var a=document.getElementById('alasanTolak'); d.alasan=a?a.value:''; }
   if(aksi!=='tolak' && fileJalan(d.bukti)){
-    tugasBaru('prosesTransfer',{id:d.t.id, aksi:aksi, alasan:d.alasan||''},{bukti:d.bukti},'Transfer '+d.t.orang,'Tercatat sudah ditransfer. '+d.t.orang+' diberi tahu.');
-    d.t.status=d.t.jenis==='Minta dana'?'Menunggu invoice':'Selesai'; d.t.trfOleh=isAdmin()?'Hani':DATA.siapa; d.t.trfPada=new Date().toISOString();
+    d.t.status=d.t.jenis==='Minta dana'&&!d.t.no?'Menunggu invoice':'Selesai'; d.t.trfOleh=isAdmin()?'Hani':DATA.siapa; d.t.trfPada=new Date().toISOString();
+    tugasBaru('prosesTransfer',{id:d.t.id, aksi:aksi, alasan:d.alasan||''},{bukti:d.bukti},'Transfer '+d.t.orang,d.t.orang+' sudah diberi tahu ✓',{trf:d.t.id, status:d.t.status, oleh:d.t.trfOleh, pada:d.t.trfPada});
     S.dialog=null; simpanData(); toast('Tercatat ✓'); render(); return;
   }
   d.jalan=true; d.galat=null; render();
@@ -1970,7 +2007,7 @@ function muat(diam, segar){
   S.memuat=true; if(!diam) S.galat=null; render();
   srv().withSuccessHandler(function(d){
     S.memuat=false; S.galat=null;
-    d._waktu=new Date().toISOString(); DATA=d; simpanData();
+    d._waktu=new Date().toISOString(); DATA=d; terapkanTugas(); simpanData();
     if(S.lihat && !DATA.orang[S.lihat]) S.lihat=null;
     setBadge(); render(); kirimAntre(); jalankanTugas(); pakaiBagikan();
   }).withFailureHandler(function(e){
@@ -2084,7 +2121,7 @@ function mintaGanti(k){
 function tandaiBatal(){
   var dl=S.dialog; if(!dl||dl.jalan) return;
   if(fileJalan(dl.bukti)||fileJalan(dl.buktiTf)){
-    tugasBaru('tandaiBatal',{id:dl.id, orang:dl.orang, baris:dl.b[7], no:dl.b[2]},{bukti:dl.bukti,buktiTf:dl.buktiTf},'Pembatalan '+namaToko(dl.b[3]),namaToko(dl.b[3])+' ditandai dibatalkan');
+    tugasBaru('tandaiBatal',{id:dl.id, orang:dl.orang, baris:dl.b[7], no:dl.b[2]},{bukti:dl.bukti,buktiTf:dl.buktiTf},'Pembatalan '+namaToko(dl.b[3]),namaToko(dl.b[3])+' ditandai dibatalkan',{batal:{orang:dl.orang, no:dl.b[2]}});
     dl.b[5]='Dibatalkan'; S.dialog=null; S.aksi=null; simpanData(); toast('Ditandai dibatalkan ✓'); render(); return;
   }
   dl.jalan=true; dl.galat=null; render();
