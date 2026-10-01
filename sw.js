@@ -1,4 +1,4 @@
-var CACHE = 'sharelinkgan-v6';
+var CACHE = 'sharelinkgan-v7';
 var CACHE_BAGI = 'sl-bagikan';
 var FILES = ['./', './index.html', './config.js', './manifest.json', './ikon-192.png', './ikon-512.png', './apple-touch-icon.png', './ikon-badge.png'];
 self.addEventListener('install', function (e) {
@@ -30,7 +30,7 @@ self.addEventListener('fetch', function (e) {
   if (e.request.method !== 'GET' || url.indexOf('callback=') >= 0 || url.indexOf('script.google') >= 0 || url.indexOf('googleusercontent') >= 0) return;
   if (new URL(url).origin !== self.location.origin) return;
   e.respondWith(
-    fetch(e.request).then(function (r) {
+    fetch(e.request.mode === 'navigate' ? new Request(url, { cache: 'no-cache', credentials: 'same-origin' }) : e.request).then(function (r) {
       var salin = r.clone(); caches.open(CACHE).then(function (c) { c.put(e.request, salin); }); return r;
     }).catch(function () { return caches.match(e.request).then(function (r) { return r || caches.match('./index.html'); }); })
   );
