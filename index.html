@@ -518,7 +518,7 @@ function jsonp(param, selesai, batasMs){
     setTimeout(function(){ try{ delete window[nama]; }catch(e){} }, 120000);
     if(tag.parentNode) tag.parentNode.removeChild(tag);
   }
-  var jam=setTimeout(function(){ if(!sudah){ bersih(); selesai(new Error('Server tidak menjawab. Periksa internet, lalu coba lagi.')); } }, batasMs||60000);
+  var jam=setTimeout(function(){ if(!sudah){ bersih(); selesai(new Error('Server tidak menjawab. Periksa internet, lalu coba lagi.')); } }, batasMs||170000);
   window[nama]=function(isi){
     if(sudah) return; bersih();
     if(isi && isi.galat){ var er=new Error(isi.galat); er.kodeSalah=!!isi.kodeSalah; selesai(er); }
@@ -1965,7 +1965,7 @@ function pakaiBagikan(){
 /* ---------- muat data ---------- */
 var muatNanti=null;
 function simpanData(){ lsSet(DATA_KEY,DATA); }
-function muat(diam){
+function muat(diam, segar){
   if(!KODE||S.memuat) return;
   S.memuat=true; if(!diam) S.galat=null; render();
   srv().withSuccessHandler(function(d){
@@ -1975,7 +1975,7 @@ function muat(diam){
     setBadge(); render(); kirimAntre(); jalankanTugas(); pakaiBagikan();
   }).withFailureHandler(function(e){
     S.memuat=false; S.galat=(e&&e.message)||String(e); render();
-  }).getData();
+  }).getData(segar?{segar:1}:{});
 }
 function kodeDitolak(){
   KODE=''; lsDel(KODE_KEY); DATA=null; lsDel(DATA_KEY); S.memuat=false; kirimJalan=false;
@@ -2019,7 +2019,7 @@ document.getElementById('app').addEventListener('click',function(e){
   else if(t.hasAttribute('data-bukacatat')){ S.lembar='catat'; S.anim=true; panaskan(); }
   else if(t.hasAttribute('data-bukakomisi')){ S.lembar='komisi'; S.anim=true; }
   else if(t.hasAttribute('data-tutup')||t.hasAttribute('data-tirai')){ if(S.dialog&&S.dialog.jalan) return; if(S.dialog) S.dialog=null; else { S.lembar=null; S.lihat_inv=null; } }
-  else if(t.hasAttribute('data-muat')){ muat(); return; }
+  else if(t.hasAttribute('data-muat')){ muat(false,true); return; }
   else if(t.hasAttribute('data-menu')){ S.dialog={jenis:'menu'}; S.anim=true; }
   else if(t.hasAttribute('data-keluar')){ KODE=''; lsDel(KODE_KEY); DATA=null; lsDel(DATA_KEY); S.dialog=null; S.lihat=null; S.kodeErr=''; }
   else if(d.lihat){ S.lihat=d.lihat; S.filter='semua'; S.cari=''; S.buka={}; }
